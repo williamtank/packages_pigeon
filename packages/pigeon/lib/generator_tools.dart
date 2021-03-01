@@ -88,8 +88,7 @@ class Indent {
     Function func, {
     bool addTrailingNewline = true,
   }) {
-    scoped(str() + begin ?? '', end, func,
-        addTrailingNewline: addTrailingNewline);
+    scoped(str() + begin ?? '', end, func, addTrailingNewline: addTrailingNewline);
   }
 
   /// Scoped increase of the ident level.  For the execution of [func] the
@@ -152,9 +151,8 @@ HostDatatype getHostDatatype(
   final String datatype = builtinResolver(field.dataType);
   if (datatype == null) {
     if (classes.map((Class x) => x.name).contains(field.dataType)) {
-      final String customName = customResolver != null
-          ? customResolver(field.dataType)
-          : field.dataType;
+      final String customName =
+          customResolver != null ? customResolver(field.dataType) : field.dataType;
       return HostDatatype(datatype: customName, isBuiltin: false);
     } else {
       throw Exception(
@@ -190,7 +188,26 @@ class Keys {
   static const String errorDetails = 'details';
 }
 
+/// basic type
+const List<String> _validTypes = <String>[
+  'String',
+  'bool',
+  'int',
+  'double',
+  'Uint8List',
+  'Int32List',
+  'Int64List',
+  'Float64List',
+  'List',
+  'Map',
+];
+
 /// Returns true if `type` represents 'void'.
-bool isVoid(TypeMirror type) {
-  return MirrorSystem.getName(type.simpleName) == 'void';
-}
+bool isVoid(TypeMirror type) => MirrorSystem.getName(type.simpleName) == 'void';
+
+/// Returns true if TypeMirror or ClassMirror represents basic type
+bool isBasicType(DeclarationMirror type) =>
+    _validTypes.contains(MirrorSystem.getName(type.simpleName));
+
+/// Returns true if `type` string represents basic type
+bool isBasicTypeStr(String type) => _validTypes.contains(type);

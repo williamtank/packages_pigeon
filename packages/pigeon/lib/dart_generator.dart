@@ -12,10 +12,7 @@ class DartOptions {
 }
 
 String _escapeForDartSingleQuotedString(String raw) {
-  return raw
-      .replaceAll(r'\', r'\\')
-      .replaceAll(r'$', r'\$')
-      .replaceAll(r"'", r"\'");
+  return raw.replaceAll(r'\', r'\\').replaceAll(r'$', r'\$').replaceAll(r"'", r"\'");
 }
 
 void _writeHostApi(DartOptions opt, Indent indent, Api api) {
@@ -34,17 +31,25 @@ void _writeHostApi(DartOptions opt, Indent indent, Api api) {
       String argSignature = '';
       String sendArgument = 'null';
       String encodedDeclaration;
-      if (func.argType != 'void') {
-        argSignature = '${func.argType} arg';
+      if (func.arguments.isNotEmpty) {
+        argSignature = func.getArgsTemplate();
+
         sendArgument = 'encoded';
-        encodedDeclaration = 'final Object encoded = arg.encode();';
+        encodedDeclaration = 'Map<Object, Object> encoded = <Object, Object>{};';
       }
       indent.write(
-        'Future<${func.returnType}> ${func.name}($argSignature) async ',
+        'Future<${func.returnType.value}> ${func.name}($argSignature) async ',
       );
       indent.scoped('{', '}', () {
         if (encodedDeclaration != null) {
           indent.writeln(encodedDeclaration);
+          for (Argument arg in func.arguments) {
+            if (arg.isBasic) {
+              indent.writeln('encoded[\'${arg.name}\'] = ${arg.name};');
+            } else {
+              indent.writeln('encoded[\'${arg.name}\'] = ${arg.name}.encode();');
+            }
+          }
         }
         final String channelName = makeChannelName(api, func);
         indent.writeln('const BasicMessageChannel<Object$nullTag> channel =');
@@ -53,9 +58,17 @@ void _writeHostApi(DartOptions opt, Indent indent, Api api) {
             'BasicMessageChannel<Object$nullTag>(\'$channelName\', StandardMessageCodec());',
           );
         });
-        final String returnStatement = func.returnType == 'void'
-            ? '// noop'
-            : 'return ${func.returnType}.decode(replyMap[\'${Keys.result}\']$unwrapOperator);';
+
+        String returnStatement;
+        if (func.returnType.isVoid) {
+          returnStatement = '// noop';
+        } else if (func.returnType.isBasic) {
+          returnStatement = 'return replyMap[\'${Keys.result}\']$unwrapOperator;';
+        } else {
+          returnStatement =
+              'return ${func.returnType.value}.decode(replyMap[\'${Keys.result}\']$unwrapOperator);';
+        }
+
         indent.format(
             '''final Map<Object$nullTag, Object$nullTag>$nullTag replyMap = await channel.send($sendArgument) as Map<Object$nullTag, Object$nullTag>$nullTag;
 if (replyMap == null) {
@@ -93,11 +106,11 @@ void _writeFlutterApi(
   indent.scoped('{', '}', () {
     for (Method func in api.methods) {
       final bool isAsync = func.isAsynchronous;
-      final String returnType =
-          isAsync ? 'Future<${func.returnType}>' : '${func.returnType}';
-      final String argSignature =
-          func.argType == 'void' ? '' : '${func.argType} arg';
-      indent.writeln('$returnType ${func.name}($argSignature);');
+      final String returnStr =
+          isAsync ? 'Future<${func.returnType.value}>' : '${func.returnType.value}';
+
+      final String argSignature = func.getArgsTemplate();
+      indent.writeln('$returnStr ${func.name}($argSignature);');
     }
     indent.write('static void setup(${api.name}$nullTag api) ');
     indent.scoped('{', '}', () {
@@ -127,19 +140,19 @@ void _writeFlutterApi(
               'channel.$messageHandlerSetter((Object$nullTag message) async ',
             );
             indent.scoped('{', '});', () {
-              final String argType = func.argType;
-              final String returnType = func.returnType;
               final bool isAsync = func.isAsynchronous;
               final String emptyReturnStatement = isMockHandler
                   ? 'return <Object$nullTag, Object$nullTag>{};'
-                  : func.returnType == 'void'
+                  : func.returnType.isVoid
                       ? 'return;'
                       : 'return null;';
               String call;
-              if (argType == 'void') {
+              // weilin, waiting to change @FlutterApi
+              if (func.arguments.isEmpty) {
                 indent.writeln('// ignore message');
                 call = 'api.${func.name}()';
               } else {
+                final String argType = func.arguments[0].type;
                 indent.writeln(
                   'assert(message != null, \'Argument for $channelName was null. Expected $argType.\');',
                 );
@@ -148,7 +161,7 @@ void _writeFlutterApi(
                 );
                 call = 'api.${func.name}(input)';
               }
-              if (returnType == 'void') {
+              if (func.returnType.isVoid) {
                 if (isAsync) {
                   indent.writeln('await $call;');
                 } else {
@@ -156,11 +169,10 @@ void _writeFlutterApi(
                 }
                 indent.writeln(emptyReturnStatement);
               } else {
-                if (isAsync) {
-                  indent.writeln('final $returnType output = await $call;');
-                } else {
-                  indent.writeln('final $returnType output = $call;');
-                }
+                final String outputStatement = isAsync ? 'await $call' : '$call';
+                indent.writeln(
+                    'final ${func.returnType.value} output = $outputStatement;');
+
                 const String returnExpresion = 'output.encode()';
                 final String returnStatement = isMockHandler
                     ? 'return <Object$nullTag, Object$nullTag>{\'${Keys.result}\': $returnExpresion};'
@@ -210,11 +222,16 @@ void generateDart(DartOptions opt, Root root, StringSink sink) {
     indent.writeln('');
     sink.write('class ${klass.name} ');
     indent.scoped('{', '}', () {
+      final List<String> _constructorParams = <String>[];
       for (Field field in klass.fields) {
         final String datatype = '${_addGenericTypes(field.dataType, nullTag)}';
         indent.writeln('$datatype ${field.name};');
+        _constructorParams.add('this.${field.name}');
       }
+      // write constructor
       if (klass.fields.isNotEmpty) {
+        indent.writeln('');
+        indent.writeln('${klass.name}({${_constructorParams.join(", ")}});');
         indent.writeln('');
       }
       indent.write('Object encode() ');

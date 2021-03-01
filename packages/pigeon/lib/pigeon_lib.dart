@@ -15,19 +15,6 @@ import 'dart_generator.dart';
 import 'generator_tools.dart';
 import 'objc_generator.dart';
 
-const List<String> _validTypes = <String>[
-  'String',
-  'bool',
-  'int',
-  'double',
-  'Uint8List',
-  'Int32List',
-  'Int64List',
-  'Float64List',
-  'List',
-  'Map',
-];
-
 class _Asynchronous {
   const _Asynchronous();
 }
@@ -188,8 +175,8 @@ class Pigeon {
           .whereType<ClassMirror>()
 
           ///note: This will need to be changed if we support generic types.
-          .where((ClassMirror mirror) =>
-              !_validTypes.contains(MirrorSystem.getName(mirror.simpleName)));
+          .where((ClassMirror mirror) => !isBasicType(mirror));
+
       for (Class klass in _parseClassMirrors(nestedTypes)) {
         yield klass;
       }
@@ -223,11 +210,20 @@ class Pigeon {
     for (ClassMirror apiMirror in apis) {
       for (DeclarationMirror declaration in apiMirror.declarations.values) {
         if (declaration is MethodMirror && !declaration.isConstructor) {
-          if (!isVoid(declaration.returnType)) {
+          // todo 如何判断是class类型
+          if (!isVoid(declaration.returnType) &&
+              !isBasicType(declaration.returnType)) {
             classes.add(declaration.returnType);
           }
           if (declaration.parameters.isNotEmpty) {
-            classes.add(declaration.parameters[0].type);
+            // classes.add(declaration.parameters[0].type);
+            // weilin, not only one parameter
+            for (ParameterMirror param in declaration.parameters) {
+              if (!isBasicType(param.type)) {
+                //todo 优化如何判断class
+                classes.add(param.type);
+              }
+            }
           }
         }
       }
@@ -238,30 +234,37 @@ class Pigeon {
 
     root.apis = <Api>[];
     for (ClassMirror apiMirror in apis) {
-      final List<Method> functions = <Method>[];
+      final List<Method> methods = <Method>[];
+
       for (DeclarationMirror declaration in apiMirror.declarations.values) {
         if (declaration is MethodMirror && !declaration.isConstructor) {
-          final bool isAsynchronous =
-              declaration.metadata.any((InstanceMirror it) {
+          final bool isAsynchronous = declaration.metadata.any((InstanceMirror it) {
             return MirrorSystem.getName(it.type.simpleName) ==
                 '${async.runtimeType}';
           });
-          functions.add(Method()
-            ..name = MirrorSystem.getName(declaration.simpleName)
-            ..argType = declaration.parameters.isEmpty
-                ? 'void'
-                : MirrorSystem.getName(
-                    declaration.parameters[0].type.simpleName)
-            ..returnType =
-                MirrorSystem.getName(declaration.returnType.simpleName)
-            ..isAsynchronous = isAsynchronous);
+
+          final List<Argument> _arguments = <Argument>[];
+          if (declaration.parameters.isNotEmpty) {
+            for (ParameterMirror param in declaration.parameters) {
+              _arguments.add(Argument(
+                  type: MirrorSystem.getName(param.type.simpleName),
+                  name: MirrorSystem.getName(param.simpleName)));
+            }
+          }
+
+          methods.add(Method(
+              name: MirrorSystem.getName(declaration.simpleName),
+              arguments: _arguments,
+              returnType: ReturnType(
+                  MirrorSystem.getName(declaration.returnType.simpleName)),
+              isAsynchronous: isAsynchronous));
         }
       }
       final HostApi hostApi = _getHostApi(apiMirror);
       root.apis.add(Api(
           name: MirrorSystem.getName(apiMirror.simpleName),
           location: hostApi != null ? ApiLocation.host : ApiLocation.flutter,
-          methods: functions,
+          methods: methods,
           dartHostTestHandler: hostApi?.dartHostTestHandler));
     }
 
@@ -326,7 +329,7 @@ options:
     if (output == 'stdout') {
       sink = stdout;
     } else {
-      file = File(output);
+      file = File(output)..createSync(recursive: true);
       sink = file.openWrite();
     }
     func(sink);
@@ -337,10 +340,14 @@ options:
     final List<Error> result = <Error>[];
     final List<String> customClasses =
         root.classes.map((Class x) => x.name).toList();
+
+    bool _isValidateType(String type) {
+      return isBasicTypeStr(type) || customClasses.contains(type);
+    }
+
     for (Class klass in root.classes) {
       for (Field field in klass.fields) {
-        if (!(_validTypes.contains(field.dataType) ||
-            customClasses.contains(field.dataType))) {
+        if (!_isValidateType(field.dataType)) {
           result.add(Error(
               message:
                   'Unsupported datatype:"${field.dataType}" in class "${klass.name}".'));
@@ -349,15 +356,18 @@ options:
     }
     for (Api api in root.apis) {
       for (Method method in api.methods) {
-        if (_validTypes.contains(method.argType)) {
-          result.add(Error(
-              message:
-                  'Unsupported argument type: "${method.argType}" in API: "${api.name}" method: "${method.name}'));
+        for (Argument arg in method.arguments) {
+          if (!_isValidateType(arg.type)) {
+            result.add(Error(
+                message:
+                    'Unsupported argument type: "${arg.type}" in API: "${api.name}" method: "${method.name}'));
+          }
         }
-        if (_validTypes.contains(method.returnType)) {
+        final ReturnType reType = method.returnType;
+        if (!_isValidateType(reType.value) && reType.isNotVoid) {
           result.add(Error(
               message:
-                  'Unsupported return type: "${method.returnType}" in API: "${api.name}" method: "${method.name}'));
+                  'Unsupported return type: "${reType.value}" in API: "${api.name}" method: "${method.name}'));
         }
       }
     }
@@ -367,6 +377,7 @@ options:
 
   /// Crawls through the reflection system looking for a configurePigeon method and
   /// executing it.
+  /// 通过mirror寻找全局函数configurePigeon，把cmd参数解析出来的options，再执行一次configurePigeon
   static void _executeConfigurePigeon(PigeonOptions options) {
     for (LibraryMirror library in currentMirrorSystem().libraries.values) {
       for (DeclarationMirror declaration in library.declarations.values) {
@@ -447,14 +458,14 @@ options:
       if (options.objcHeaderOut != null) {
         await _runGenerator(
             options.objcHeaderOut,
-            (StringSink sink) => generateObjcHeader(
-                options.objcOptions, parseResults.root, sink));
+            (StringSink sink) =>
+                generateObjcHeader(options.objcOptions, parseResults.root, sink));
       }
       if (options.objcSourceOut != null) {
         await _runGenerator(
             options.objcSourceOut,
-            (StringSink sink) => generateObjcSource(
-                options.objcOptions, parseResults.root, sink));
+            (StringSink sink) =>
+                generateObjcSource(options.objcOptions, parseResults.root, sink));
       }
       if (options.javaOut != null) {
         await _runGenerator(
@@ -476,8 +487,7 @@ options:
     for (Error err in errors) {
       if (err.filename != null) {
         if (err.lineNumber != null) {
-          stderr.writeln(
-              'Error: ${err.filename}:${err.lineNumber}: ${err.message}');
+          stderr.writeln('Error: ${err.filename}:${err.lineNumber}: ${err.message}');
         } else {
           stderr.writeln('Error: ${err.filename}: ${err.message}');
         }

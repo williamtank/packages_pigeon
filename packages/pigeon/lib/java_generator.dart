@@ -43,16 +43,18 @@ void _writeHostApi(Indent indent, Api api) {
   indent.write('public interface ${api.name} ');
   indent.scoped('{', '}', () {
     for (Method method in api.methods) {
-      final String returnType =
-          method.isAsynchronous ? 'void' : method.returnType;
+      final String returnTypeValue = method.returnType.val(Language.java);
+      final String returnStateMement =
+          method.isAsynchronous ? 'void' : returnTypeValue;
+
       final List<String> argSignature = <String>[];
-      if (method.argType != 'void') {
-        argSignature.add('${method.argType} arg');
-      }
+      argSignature.add(method.getArgsTemplate(Language.java));
+
       if (method.isAsynchronous) {
-        argSignature.add('Result<${method.returnType}> result');
+        argSignature.add('Result<$returnTypeValue> result');
       }
-      indent.writeln('$returnType ${method.name}(${argSignature.join(', ')});');
+      indent
+          .writeln('$returnStateMement ${method.name}(${argSignature.join(', ')});');
     }
     indent.addln('');
     indent.writeln(
@@ -75,44 +77,54 @@ void _writeHostApi(Indent indent, Api api) {
           indent.scoped('{', '} else {', () {
             indent.write('channel.setMessageHandler((message, reply) -> ');
             indent.scoped('{', '});', () {
-              final String argType = method.argType;
-              final String returnType = method.returnType;
-              indent.writeln(
-                  'HashMap<String, HashMap> wrapped = new HashMap<>();');
+              indent.writeln('HashMap<String, Object> wrapped = new HashMap<>();');
               indent.write('try ');
               indent.scoped('{', '}', () {
                 final List<String> methodArgument = <String>[];
-                if (argType != 'void') {
+                if (method.arguments.isNotEmpty) {
                   indent.writeln('@SuppressWarnings("ConstantConditions")');
-                  indent.writeln(
-                      '$argType input = $argType.fromMap((HashMap)message);');
-                  methodArgument.add('input');
+                  indent.writeln('HashMap reqParams = (HashMap) message;');
+                  for (Argument arg in method.arguments) {
+                    if (arg.isBasic) {
+                      indent.writeln(
+                          '${arg.typeTo(Language.java)} ${arg.name} = (${arg.typeTo(Language.java)}) reqParams.get("${arg.name}");');
+                    } else {
+                      indent.writeln(
+                          '${arg.type} ${arg.name} = ${arg.type}.fromMap((HashMap) reqParams.get("${arg.name}"));');
+                    }
+                    methodArgument.add(arg.name);
+                  }
                 }
                 if (method.isAsynchronous) {
+                  final String resultStr =
+                      method.returnType.isBasic ? 'result' : 'result.toMap()';
                   methodArgument.add(
                     'result -> { '
-                    'wrapped.put("${Keys.result}", result.toMap()); '
+                    'wrapped.put("${Keys.result}", $resultStr); '
                     'reply.reply(wrapped); '
                     '}',
                   );
                 }
                 final String call =
                     'api.${method.name}(${methodArgument.join(', ')})';
+                final String returnTypeVal = method.returnType.val(Language.java);
                 if (method.isAsynchronous) {
                   indent.writeln('$call;');
-                } else if (method.returnType == 'void') {
+                } else if (method.returnType.isVoid) {
                   indent.writeln('$call;');
                   indent.writeln('wrapped.put("${Keys.result}", null);');
+                } else if (method.returnType.isBasic) {
+                  indent.writeln('$returnTypeVal output = $call;');
+                  indent.writeln('wrapped.put("${Keys.result}", output);');
                 } else {
-                  indent.writeln('$returnType output = $call;');
-                  indent.writeln(
-                      'wrapped.put("${Keys.result}", output.toMap());');
+                  indent.writeln('$returnTypeVal output = $call;');
+                  indent.writeln('wrapped.put("${Keys.result}", output.toMap());');
                 }
               });
               indent.write('catch (Exception exception) ');
               indent.scoped('{', '}', () {
-                indent.writeln(
-                    'wrapped.put("${Keys.error}", wrapError(exception));');
+                indent
+                    .writeln('wrapped.put("${Keys.error}", wrapError(exception));');
                 if (method.isAsynchronous) {
                   indent.writeln('reply.reply(wrapped);');
                 }
@@ -148,15 +160,16 @@ void _writeFlutterApi(Indent indent, Api api) {
     });
     for (Method func in api.methods) {
       final String channelName = makeChannelName(api, func);
-      final String returnType =
-          func.returnType == 'void' ? 'Void' : func.returnType;
+      final String returnTypeVal =
+          func.returnType.isVoid ? 'Void' : func.returnType.val(Language.java);
       String sendArgument;
-      if (func.argType == 'void') {
-        indent.write('public void ${func.name}(Reply<$returnType> callback) ');
+      if (func.arguments.isNotEmpty) {
+        indent.write('public void ${func.name}(Reply<$returnTypeVal> callback) ');
         sendArgument = 'null';
       } else {
+        // weilin, waiting for change @FlutterApi
         indent.write(
-            'public void ${func.name}(${func.argType} argInput, Reply<$returnType> callback) ');
+            'public void ${func.name}(${func.arguments[0]} argInput, Reply<$returnTypeVal> callback) ');
         sendArgument = 'inputMap';
       }
       indent.scoped('{', '}', () {
@@ -167,18 +180,19 @@ void _writeFlutterApi(Indent indent, Api api) {
             'new BasicMessageChannel<>(binaryMessenger, "$channelName", new StandardMessageCodec());');
         indent.dec();
         indent.dec();
-        if (func.argType != 'void') {
+        if (func.arguments.isNotEmpty) {
           indent.writeln('HashMap inputMap = argInput.toMap();');
         }
         indent.write('channel.send($sendArgument, channelReply -> ');
         indent.scoped('{', '});', () {
-          if (func.returnType == 'void') {
+          if (func.returnType.isVoid) {
             indent.writeln('callback.reply(null);');
           } else {
             indent.writeln('HashMap outputMap = (HashMap)channelReply;');
             indent.writeln('@SuppressWarnings("ConstantConditions")');
+            // todo 还需要适配基本类型
             indent.writeln(
-                '${func.returnType} output = ${func.returnType}.fromMap(outputMap);');
+                '$returnTypeVal output = $returnTypeVal.fromMap(outputMap);');
             indent.writeln('callback.reply(output);');
           }
         });
@@ -219,8 +233,7 @@ String _castObject(Field field, List<Class> classes, String varName) {
 /// Generates the ".java" file for the AST represented by [root] to [sink] with the
 /// provided [options].
 void generateJava(JavaOptions options, Root root, StringSink sink) {
-  final Set<String> rootClassNameSet =
-      root.classes.map((Class x) => x.name).toSet();
+  final Set<String> rootClassNameSet = root.classes.map((Class x) => x.name).toSet();
   final Indent indent = Indent(sink);
   indent.writeln('// $generatedCodeWarning');
   indent.writeln('// $seeAlsoWarning');
@@ -259,8 +272,7 @@ void generateJava(JavaOptions options, Root root, StringSink sink) {
         }
         indent.write('HashMap toMap() ');
         indent.scoped('{', '}', () {
-          indent.writeln(
-              'HashMap<String, Object> toMapResult = new HashMap<>();');
+          indent.writeln('HashMap<String, Object> toMapResult = new HashMap<>();');
           for (Field field in klass.fields) {
             final HostDatatype hostDatatype =
                 getHostDatatype(field, root.classes, _javaTypeForDartType);

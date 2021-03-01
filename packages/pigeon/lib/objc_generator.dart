@@ -71,8 +71,7 @@ String _propertyTypeForDartType(String type) {
   }
 }
 
-void _writeClassDeclarations(
-    Indent indent, List<Class> classes, String prefix) {
+void _writeClassDeclarations(Indent indent, List<Class> classes, String prefix) {
   for (Class klass in classes) {
     indent.writeln('@interface ${_className(prefix, klass.name)} : NSObject');
     for (Field field in klass.fields) {
@@ -96,9 +95,10 @@ void _writeHostApiDeclaration(Indent indent, Api api, ObjcOptions options) {
   final String apiName = _className(options.prefix, api.name);
   indent.writeln('@protocol $apiName');
   for (Method func in api.methods) {
-    final String returnTypeName = _className(options.prefix, func.returnType);
+    final String returnTypeName =
+        _className(options.prefix, func.returnType.val(Language.oc));
     if (func.isAsynchronous) {
-      if (func.returnType == 'void') {
+      if (func.returnType.isVoid) {
         if (func.argType == 'void') {
           indent.writeln(
               '-(void)${func.name}:(void(^)(FlutterError *_Nullable))completion;');
@@ -119,7 +119,7 @@ void _writeHostApiDeclaration(Indent indent, Api api, ObjcOptions options) {
       }
     } else {
       final String returnType =
-          func.returnType == 'void' ? 'void' : 'nullable $returnTypeName *';
+          func.returnType.isVoid ? 'void' : 'nullable $returnTypeName *';
       if (func.argType == 'void') {
         indent.writeln(
             '-($returnType)${func.name}:(FlutterError *_Nullable *_Nonnull)error;');
@@ -143,8 +143,9 @@ void _writeFlutterApiDeclaration(Indent indent, Api api, ObjcOptions options) {
   indent.writeln(
       '- (instancetype)initWithBinaryMessenger:(id<FlutterBinaryMessenger>)binaryMessenger;');
   for (Method func in api.methods) {
-    final String returnType = _className(options.prefix, func.returnType);
-    final String callbackType = _callbackForType(func.returnType, returnType);
+    final String returnType =
+        _className(options.prefix, func.returnType.val(Language.oc));
+    final String callbackType = _callbackForType(func.returnType.value, returnType);
     if (func.argType == 'void') {
       indent.writeln('- (void)${func.name}:($callbackType)completion;');
     } else {
@@ -224,8 +225,7 @@ void _writeHostApiSource(Indent indent, ObjcOptions options, Api api) {
         indent.inc();
         indent.writeln('[FlutterBasicMessageChannel');
         indent.inc();
-        indent
-            .writeln('messageChannelWithName:@"${makeChannelName(api, func)}"');
+        indent.writeln('messageChannelWithName:@"${makeChannelName(api, func)}"');
         indent.writeln('binaryMessenger:binaryMessenger];');
         indent.dec();
         indent.dec();
@@ -236,7 +236,7 @@ void _writeHostApiSource(Indent indent, ObjcOptions options, Api api) {
               '[channel setMessageHandler:^(id _Nullable message, FlutterReply callback) ');
           indent.scoped('{', '}];', () {
             final String returnType =
-                _className(options.prefix, func.returnType);
+                _className(options.prefix, func.returnType.val(Language.oc));
             String syncCall;
             if (func.argType == 'void') {
               syncCall = '[api ${func.name}:&error]';
@@ -246,12 +246,12 @@ void _writeHostApiSource(Indent indent, ObjcOptions options, Api api) {
               syncCall = '[api ${func.name}:input error:&error]';
             }
             if (func.isAsynchronous) {
-              if (func.returnType == 'void') {
+              if (func.returnType.isVoid) {
                 const String callback = 'callback(error));';
                 if (func.argType == 'void') {
                   indent.writeScoped(
-                      '[api ${func.name}:^(FlutterError *_Nullable error) {',
-                      '}];', () {
+                      '[api ${func.name}:^(FlutterError *_Nullable error) {', '}];',
+                      () {
                     indent.writeln(callback);
                   });
                 } else {
@@ -280,7 +280,7 @@ void _writeHostApiSource(Indent indent, ObjcOptions options, Api api) {
               }
             } else {
               indent.writeln('FlutterError *error;');
-              if (func.returnType == 'void') {
+              if (func.returnType.isVoid) {
                 indent.writeln('$syncCall;');
                 indent.writeln('callback(wrapResult(nil, error));');
               } else {
@@ -320,8 +320,9 @@ void _writeFlutterApiSource(Indent indent, ObjcOptions options, Api api) {
   });
   indent.addln('');
   for (Method func in api.methods) {
-    final String returnType = _className(options.prefix, func.returnType);
-    final String callbackType = _callbackForType(func.returnType, returnType);
+    final String returnType =
+        _className(options.prefix, func.returnType.val(Language.oc));
+    final String callbackType = _callbackForType(func.returnType.value, returnType);
 
     String sendArgument;
     if (func.argType == 'void') {
@@ -347,12 +348,11 @@ void _writeFlutterApiSource(Indent indent, ObjcOptions options, Api api) {
       }
       indent.write('[channel sendMessage:$sendArgument reply:^(id reply) ');
       indent.scoped('{', '}];', () {
-        if (func.returnType == 'void') {
+        if (func.returnType.isVoid) {
           indent.writeln('completion(nil);');
         } else {
           indent.writeln('NSDictionary* outputMap = reply;');
-          indent.writeln(
-              '$returnType * output = [$returnType fromMap:outputMap];');
+          indent.writeln('$returnType * output = [$returnType fromMap:outputMap];');
           indent.writeln('completion(output, nil);');
         }
       });
@@ -365,8 +365,7 @@ void _writeFlutterApiSource(Indent indent, ObjcOptions options, Api api) {
 /// provided [options].
 void generateObjcSource(ObjcOptions options, Root root, StringSink sink) {
   final Indent indent = Indent(sink);
-  final List<String> classnames =
-      root.classes.map((Class x) => x.name).toList();
+  final List<String> classnames = root.classes.map((Class x) => x.name).toList();
 
   indent.writeln('// $generatedCodeWarning');
   indent.writeln('// $seeAlsoWarning');
@@ -416,8 +415,7 @@ void generateObjcSource(ObjcOptions options, Root root, StringSink sink) {
       for (Field field in klass.fields) {
         indent.writeln(
             '$resultName.${field.name} = ${_dictGetter(classnames, 'dict', field, options.prefix)};');
-        indent.write(
-            'if ((NSNull *)$resultName.${field.name} == [NSNull null]) ');
+        indent.write('if ((NSNull *)$resultName.${field.name} == [NSNull null]) ');
         indent.scoped('{', '}', () {
           indent.writeln('$resultName.${field.name} = nil;');
         });

@@ -1,0 +1,39 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "pigeon",
+            "request": "launch",
+            "type": "dart",
+            "program": "bin/pigeon.dart",
+            "args": ["--input", "example/search.dart"],  
+        },
+        {
+            "name": "mock_handler_tester",
+            "cwd": "mock_handler_tester",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "test_objc",
+            "cwd": "e2e_tests/test_objc",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "flutter_null_safe_unit_tests",
+            "cwd": "platform_tests/flutter_null_safe_unit_tests",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "ios_unit_tests",
+            "cwd": "platform_tests/ios_unit_tests",
+            "request": "launch",
+            "type": "dart"
+        }
+    ]
+}
