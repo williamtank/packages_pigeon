@@ -7,7 +7,7 @@
 #error File requires ARC to be enabled.
 #endif
 
-static NSDictionary<NSString*, id>* wrapResult(NSDictionary *result, FlutterError *error) {
+static NSDictionary<NSString*, id>* wrapResult(NSObject *result, FlutterError *error) {
   NSDictionary *errorDict = (NSDictionary *)[NSNull null];
   if (error) {
     errorDict = @{
@@ -93,9 +93,13 @@ void FLTSearchApiSetup(id<FlutterBinaryMessenger> binaryMessenger, id<FLTSearchA
         binaryMessenger:binaryMessenger];
     if (api) {
       [channel setMessageHandler:^(id _Nullable message, FlutterReply callback) {
-        FLTnull *input = [FLTnull fromMap:message];
+        NSDictionary *json = (NSDictionary *) message;
+        FLTSearchRequest *request = [FLTSearchRequest fromMap:json[@"request"]];
+        FLTPerson *person = [FLTPerson fromMap:json[@"person"]];
+        NSNumber *code = json[@"code"];
+        int code = [code intValue];
         FlutterError *error;
-        FLTSearchReply *output = [api search:input error:&error];
+        FLTSearchReply * output = [api search:request person:person code:code error:&error];
         callback(wrapResult([output toMap], error));
       }];
     }
@@ -110,10 +114,14 @@ void FLTSearchApiSetup(id<FlutterBinaryMessenger> binaryMessenger, id<FLTSearchA
         binaryMessenger:binaryMessenger];
     if (api) {
       [channel setMessageHandler:^(id _Nullable message, FlutterReply callback) {
-        FLTnull *input = [FLTnull fromMap:message];
+        NSDictionary *json = (NSDictionary *) message;
+        NSNumber *code = json[@"code"];
+        int code = [code intValue];
+        FLTPerson *person = [FLTPerson fromMap:json[@"person"]];
         FlutterError *error;
-        FLTNSNumber numberWithBool: *output = [api searchByCode:input error:&error];
-        callback(wrapResult([output toMap], error));
+        BOOL output = [api searchByCode:code person:person error:&error];
+        NSNumber *outputObj = [NSNumber numberWithBool:output]
+        callback(wrapResult(outputObj, error));
       }];
     }
     else {
@@ -127,9 +135,12 @@ void FLTSearchApiSetup(id<FlutterBinaryMessenger> binaryMessenger, id<FLTSearchA
         binaryMessenger:binaryMessenger];
     if (api) {
       [channel setMessageHandler:^(id _Nullable message, FlutterReply callback) {
-        FLTnull *input = [FLTnull fromMap:message];
-        [api searchByName:input completion:^(FLTNSString *_Nullable output, FlutterError *_Nullable error) {
-          callback(wrapResult([output toMap], error));
+        NSDictionary *json = (NSDictionary *) message;
+        FLTString *name = [FLTString fromMap:json[@"name"]];
+        NSNumber *needFullName = json[@"needFullName"];
+        BOOL needFullName = [code BOOLValue];
+        [api searchByName:name needFullName:needFullName completion:^(NSString * _Nullable output, FlutterError *_Nullable error) {
+          callback(wrapResult(output, error));
         }];
       }];
     }

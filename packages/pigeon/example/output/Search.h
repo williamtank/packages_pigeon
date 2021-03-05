@@ -26,9 +26,9 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 @protocol FLTSearchApi
--(nullable FLTSearchReply *)search:(FLTnull*)input error:(FlutterError *_Nullable *_Nonnull)error;
--(nullable FLTNSNumber numberWithBool: *)searchByCode:(FLTnull*)input error:(FlutterError *_Nullable *_Nonnull)error;
--(void)searchByName:(nullable FLTnull *)input completion:(void(^)(FLTNSString *_Nullable, FlutterError *_Nullable))completion;
+-(_Nonnull FLTSearchReply *)search:(_Nonnull FLTSearchRequest *)request person:(_Nonnull FLTPerson *)person code:( int)code error:(FlutterError *_Nullable)error;
+-(BOOL)searchByCode:( int)code person:(_Nonnull FLTPerson *)person error:(FlutterError *_Nullable)error;
+-(void)searchByName:(_Nonnull NSString *)name needFullName:( BOOL)needFullName completion:(void(^)(_Nonnull NSString * _Nullable, FlutterError *_Nullable))completion;
 @end
 
 extern void FLTSearchApiSetup(id<FlutterBinaryMessenger> binaryMessenger, id<FLTSearchApi> _Nullable api);

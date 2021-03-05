@@ -62,28 +62,16 @@ class BasicType {
 
 /// Basic Type
 const List<BasicType> _basicTypes = <BasicType>[
-  BasicType(dart: 'bool', java: 'boolean', oc: 'NSNumber numberWithBool:'),
-  BasicType(dart: 'int', java: 'int', oc: 'NSNumber numberWithInt:'),
-  BasicType(dart: 'double', java: 'Double', oc: 'NSNumber numberWithDouble:'),
-  BasicType(dart: 'String', java: 'String', oc: 'NSString'),
-  BasicType(
-      dart: 'Uint8List',
-      java: 'byte[]',
-      oc: 'FlutterStandardTypedData typedDataWithBytes:'),
-  BasicType(
-      dart: 'Int32List',
-      java: 'int[]',
-      oc: 'FlutterStandardTypedData typedDataWithInt32:'),
-  BasicType(
-      dart: 'Int64List',
-      java: 'long[]',
-      oc: 'FlutterStandardTypedData typedDataWithInt64:'),
-  BasicType(
-      dart: 'Float64List',
-      java: 'double[]',
-      oc: 'FlutterStandardTypedData typedDataWithFloat64:'),
-  BasicType(dart: 'List', java: 'ArrayList', oc: 'NSArray'),
-  BasicType(dart: 'Map', java: 'HashMap', oc: 'NSDictionary'),
+  BasicType(dart: 'bool', java: 'boolean', oc: 'BOOL'),
+  BasicType(dart: 'int', java: 'int', oc: 'int'),
+  BasicType(dart: 'double', java: 'Double', oc: 'double'),
+  BasicType(dart: 'String', java: 'String', oc: 'NSString *'),
+  BasicType(dart: 'Uint8List', java: 'byte[]', oc: 'FlutterStandardTypedData *'),
+  BasicType(dart: 'Int32List', java: 'int[]', oc: 'FlutterStandardTypedData *'),
+  BasicType(dart: 'Int64List', java: 'long[]', oc: 'FlutterStandardTypedData *'),
+  BasicType(dart: 'Float64List', java: 'double[]', oc: 'FlutterStandardTypedData *'),
+  BasicType(dart: 'List', java: 'ArrayList', oc: 'NSArray *'),
+  BasicType(dart: 'Map', java: 'HashMap', oc: 'NSDictionary *'),
 ];
 
 /// for Method return Type
@@ -104,10 +92,12 @@ class ReturnType {
   bool get isNotVoid => value != 'void';
 
   ///from dart to java/oc
-  String val(Language lan) {
-    return isBasic
-        ? _basicTypes.where((BasicType t) => t.dart == value).first.dartTo(lan)
-        : value;
+  String val(Language lan, [String prefix]) {
+    if (isBasic) {
+      return _basicTypes.where((BasicType t) => t.dart == value).first.dartTo(lan);
+    } else {
+      return lan == Language.oc ? '$prefix$value *' : value;
+    }
   }
 
   @override
@@ -129,21 +119,23 @@ class Argument {
   bool get isBasic => isBasicTypeStr(type);
 
   /// Type to String from dart to java/oc
-  String typeTo(Language lan) {
-    return isBasic
-        ? _basicTypes.where((BasicType t) => t.dart == type).first.dartTo(lan)
-        : type;
+  String typeTo(Language lan, [String prefix]) {
+    if (isBasic) {
+      return _basicTypes.where((BasicType t) => t.dart == type).first.dartTo(lan);
+    } else {
+      return lan == Language.oc ? '$prefix$type *' : type;
+    }
   }
 
   /// value of template
-  String toTmpl(Language lan) => '${typeTo(lan)} $name';
-}
-
-/// just fo test
-String typeToTmpl(String type, Language lan) {
-  return isBasicTypeStr(type)
-      ? _basicTypes.where((BasicType t) => t.dart == type).first.dartTo(lan)
-      : type;
+  String toTmpl(Language lan, [String prefix]) {
+    if (lan == Language.oc) {
+      final String nullableStr = isNeedBox(type) ? '' : '_Nonnull';
+      return '($nullableStr ${typeTo(lan, prefix)})$name';
+    } else {
+      return '${typeTo(lan)} $name';
+    }
+  }
 }
 
 /// Represents a method on an [Api].
@@ -158,20 +150,31 @@ class Method extends Node {
   ReturnType returnType; //替换为的自定义Class
 
   /// The data-type of the argument.
-  String argType; // 被下面的多参数替换 todo objc没有替换完
   List<Argument> arguments = <Argument>[];
 
   /// Whether the receiver of this method is expected to return synchronously or not.
   bool isAsynchronous;
 
   /// Helper Method for argments to template
-  String getArgsTemplate([Language lan]) {
+  String getArgsTemplate([Language lan, String prefix]) {
     final List<String> tmpl = <String>[];
+
     if (arguments.isNotEmpty) {
-      for (Argument arg in arguments) {
-        tmpl.add(arg.toTmpl(lan ?? Language.dart));
+      if (lan == Language.oc) {
+        tmpl.add(arguments[0].toTmpl(Language.oc, prefix));
+
+        for (int i = 1; i < arguments.length; i++) {
+          final Argument arg = arguments[i];
+          tmpl.add(arg.name + ':' + arg.toTmpl(Language.oc, prefix));
+        }
+
+        return tmpl.join(' ');
+      } else {
+        for (Argument arg in arguments) {
+          tmpl.add(arg.toTmpl(lan ?? Language.dart));
+        }
+        return tmpl.join(', ');
       }
-      return tmpl.join(', ');
     }
     return '';
   }

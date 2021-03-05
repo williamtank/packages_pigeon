@@ -211,3 +211,6 @@ bool isBasicType(DeclarationMirror type) =>
 
 /// Returns true if `type` string represents basic type
 bool isBasicTypeStr(String type) => _validTypes.contains(type);
+
+// iOS需要装箱/拆箱的基本类型
+bool isNeedBox(String type) => type == 'bool' || type == 'int' || type == 'double';
