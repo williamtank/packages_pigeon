@@ -1,9 +1,12 @@
-# Pigeon_bb
+# Pigeon_v2
 
 **Warning: Pigeon is prerelease, breaking changes may occur.**
 
 Pigeon is a code generator tool to make communication between Flutter and the
 host platform type-safe and easier.
+
+## test commond
+`dart bin/pigeon.dart --input example/search.dart`
 
 ## Supported Platforms
 
