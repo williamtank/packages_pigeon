@@ -11,7 +11,7 @@ This is the Pigeon file that describes the interface that will be used to call
 from Flutter to the host-platform.
 
 ```dart
-import 'package:pigeon/pigeon.dart';
+import 'package:pigeonv2/pigeon.dart';
 
 class SearchRequest {
   String query;

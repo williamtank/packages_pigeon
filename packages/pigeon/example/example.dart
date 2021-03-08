@@ -1,4 +1,4 @@
-import 'package:pigeon/pigeon.dart';
+import 'package:pigeonv2/pigeon.dart';
 
 class Person {
   String name;

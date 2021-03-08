@@ -9,7 +9,7 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:path/path.dart' as path;
-import 'package:pigeon/pigeon_lib.dart';
+import 'package:pigeonv2/pigeon_lib.dart';
 
 /// This creates a relative path from `from` to `input`, the output being a
 /// posix path on all platforms.
@@ -41,7 +41,7 @@ Future<void> main(List<String> args) async {
 $importLine
 import 'dart:io';
 import 'dart:isolate';
-import 'package:pigeon/pigeon_lib.dart';
+import 'package:pigeonv2/pigeon_lib.dart';
 
 void main(List<String> args, SendPort sendPort) async {
   sendPort.send(await Pigeon.run(args));

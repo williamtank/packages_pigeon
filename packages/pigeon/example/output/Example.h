@@ -27,13 +27,13 @@ NS_ASSUME_NONNULL_BEGIN
 
 @protocol FLTExampleApi
 -(void)searchVoid:(FlutterError *_Nullable )error;
--(NSString *)searchArgEmpty:(FlutterError *_Nullable )error;
+-(_Nonnull NSString *)searchArgEmpty:(FlutterError *_Nullable )error;
 -(void)searchReturnEmpty:(FlutterError *_Nullable )error;
--(FLTReply *)search:(FLTRequest *)request error:(FlutterError *_Nullable)error;
--(BOOL)searchMore:(int)code person:(FLTPerson *)person error:(FlutterError *_Nullable)error;
--(void)searchMoreAsync:(NSString *)name needFullName:(BOOL)needFullName completion:(void(^)(NSString * _Nullable, FlutterError *_Nullable))completion;
--(void)searchReturnAsync:(int)code person:(FLTPerson *)person completion:(void(^)(FlutterError *_Nullable))completion;
--(void)searchEmptyAsync:(void(^)(FLTReply * _Nullable, FlutterError *_Nullable))completion;
+-(_Nonnull FLTReply *)search:(_Nonnull FLTRequest *)request error:(FlutterError *_Nullable)error;
+-(BOOL)searchMore:( int)code person:(_Nonnull FLTPerson *)person error:(FlutterError *_Nullable)error;
+-(void)searchMoreAsync:(_Nonnull NSString *)name needFullName:( BOOL)needFullName completion:(void(^)(_Nonnull NSString * _Nullable, FlutterError *_Nullable))completion;
+-(void)searchReturnAsync:( int)code person:(_Nonnull FLTPerson *)person completion:(void(^)(FlutterError *_Nullable))completion;
+-(void)searchEmptyAsync:(void(^)(_Nonnull FLTReply * _Nullable, FlutterError *_Nullable))completion;
 @end
 
 extern void FLTExampleApiSetup(id<FlutterBinaryMessenger> binaryMessenger, id<FLTExampleApi> _Nullable api);

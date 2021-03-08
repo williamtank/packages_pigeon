@@ -8,7 +8,7 @@ import 'dart:mirrors';
 import 'package:args/args.dart';
 import 'package:path/path.dart' as path;
 import 'package:path/path.dart';
-import 'package:pigeon/java_generator.dart';
+import 'package:pigeonv2/java_generator.dart';
 
 import 'ast.dart';
 import 'dart_generator.dart';

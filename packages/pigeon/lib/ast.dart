@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:pigeon/generator_tools.dart';
+import 'package:pigeonv2/generator_tools.dart';
 
 /// Enum that represents where an [Api] is located, on the host or Flutter.
 enum ApiLocation {
