@@ -90,14 +90,14 @@ public class Example {
 
   /** Generated interface from Pigeon that represents a handler of messages from Flutter.*/
   public interface ExampleApi {
-    void searchVoid();
+    Void searchVoid();
     String searchArgEmpty();
-    void searchReturnEmpty();
+    Void searchReturnEmpty();
     Reply search(Request request);
     boolean searchMore(int code, Person person);
     void searchMoreAsync(String name, boolean needFullName, Result<String> result);
-    void searchReturnAsync(int code, Person person, Result<void> result);
-    void searchEmptyAsync(, Result<Reply> result);
+    void searchReturnAsync(int code, Person person, Result<Void> result);
+    void searchEmptyAsync(Result<Reply> result);
 
     /** Sets up an instance of `ExampleApi` to handle messages through the `binaryMessenger` */
     static void setup(BinaryMessenger binaryMessenger, ExampleApi api) {

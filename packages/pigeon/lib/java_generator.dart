@@ -42,19 +42,20 @@ void _writeHostApi(Indent indent, Api api) {
       '/** Generated interface from Pigeon that represents a handler of messages from Flutter.*/');
   indent.write('public interface ${api.name} ');
   indent.scoped('{', '}', () {
-    for (Method method in api.methods) {
-      final String returnTypeValue = method.returnType.val(Language.java);
+    for (Method func in api.methods) {
+      final String returnTypeValue = func.returnType.val(Language.java);
       final String returnStateMement =
-          method.isAsynchronous ? 'void' : returnTypeValue;
+          func.isAsynchronous ? 'void' : returnTypeValue;
 
       final List<String> argSignature = <String>[];
-      argSignature.add(method.getArgsTemplate(Language.java));
+      if (func.arguments.isNotEmpty) {
+        argSignature.add(func.getArgsTemplate(Language.java));
+      }
 
-      if (method.isAsynchronous) {
+      if (func.isAsynchronous) {
         argSignature.add('Result<$returnTypeValue> result');
       }
-      indent
-          .writeln('$returnStateMement ${method.name}(${argSignature.join(', ')});');
+      indent.writeln('$returnStateMement ${func.name}(${argSignature.join(', ')});');
     }
     indent.addln('');
     indent.writeln(
@@ -62,8 +63,8 @@ void _writeHostApi(Indent indent, Api api) {
     indent.write(
         'static void setup(BinaryMessenger binaryMessenger, ${api.name} api) ');
     indent.scoped('{', '}', () {
-      for (Method method in api.methods) {
-        final String channelName = makeChannelName(api, method);
+      for (Method func in api.methods) {
+        final String channelName = makeChannelName(api, func);
         indent.write('');
         indent.scoped('{', '}', () {
           indent.writeln('BasicMessageChannel<Object> channel =');
@@ -81,10 +82,10 @@ void _writeHostApi(Indent indent, Api api) {
               indent.write('try ');
               indent.scoped('{', '}', () {
                 final List<String> methodArgument = <String>[];
-                if (method.arguments.isNotEmpty) {
+                if (func.arguments.isNotEmpty) {
                   indent.writeln('@SuppressWarnings("ConstantConditions")');
                   indent.writeln('HashMap reqParams = (HashMap) message;');
-                  for (Argument arg in method.arguments) {
+                  for (Argument arg in func.arguments) {
                     if (arg.isBasic) {
                       indent.writeln(
                           '${arg.typeTo(Language.java)} ${arg.name} = (${arg.typeTo(Language.java)}) reqParams.get("${arg.name}");');
@@ -95,9 +96,9 @@ void _writeHostApi(Indent indent, Api api) {
                     methodArgument.add(arg.name);
                   }
                 }
-                if (method.isAsynchronous) {
+                if (func.isAsynchronous) {
                   final String resultStr =
-                      method.returnType.isBasic ? 'result' : 'result.toMap()';
+                      func.returnType.isBasic ? 'result' : 'result.toMap()';
                   methodArgument.add(
                     'result -> { '
                     'wrapped.put("${Keys.result}", $resultStr); '
@@ -105,15 +106,14 @@ void _writeHostApi(Indent indent, Api api) {
                     '}',
                   );
                 }
-                final String call =
-                    'api.${method.name}(${methodArgument.join(', ')})';
-                final String returnTypeVal = method.returnType.val(Language.java);
-                if (method.isAsynchronous) {
+                final String call = 'api.${func.name}(${methodArgument.join(', ')})';
+                final String returnTypeVal = func.returnType.val(Language.java);
+                if (func.isAsynchronous) {
                   indent.writeln('$call;');
-                } else if (method.returnType.isVoid) {
+                } else if (func.returnType.isVoid) {
                   indent.writeln('$call;');
                   indent.writeln('wrapped.put("${Keys.result}", null);');
-                } else if (method.returnType.isBasic) {
+                } else if (func.returnType.isBasic) {
                   indent.writeln('$returnTypeVal output = $call;');
                   indent.writeln('wrapped.put("${Keys.result}", output);');
                 } else {
@@ -125,11 +125,11 @@ void _writeHostApi(Indent indent, Api api) {
               indent.scoped('{', '}', () {
                 indent
                     .writeln('wrapped.put("${Keys.error}", wrapError(exception));');
-                if (method.isAsynchronous) {
+                if (func.isAsynchronous) {
                   indent.writeln('reply.reply(wrapped);');
                 }
               });
-              if (!method.isAsynchronous) {
+              if (!func.isAsynchronous) {
                 indent.writeln('reply.reply(wrapped);');
               }
             });

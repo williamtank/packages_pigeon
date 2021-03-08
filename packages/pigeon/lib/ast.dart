@@ -95,6 +95,8 @@ class ReturnType {
   String val(Language lan, [String prefix]) {
     if (isBasic) {
       return _basicTypes.where((BasicType t) => t.dart == value).first.dartTo(lan);
+    } else if (lan == Language.java && isVoid) {
+      return 'Void';
     } else {
       return lan == Language.oc ? '$prefix$value *' : value;
     }
